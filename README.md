@@ -11,3 +11,5 @@ Set Up Steps-
 cd /var/www/htdocs/
 composer install
 ```
+
+You can now view the Sprint Reports at http://jira-report.dev/?sprint=1
