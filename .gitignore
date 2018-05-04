@@ -1,0 +1,6 @@
+.vagrant
+.vagrant/*
+.idea
+.idea/*
+htdocs/.env
+htdocs/vendor/*
