@@ -51,7 +51,9 @@ $response = \Httpful\Request::get($baseuri.$api)                  // Build a GET
     ->withoutStrictSsl()
     ->authenticateWith(getenv('JIRA_USERNAME'), getenv('JIRA_PASSWORD'))  // authenticate with basic auth...
     ->send();
-
+//echo "<pre>";
+//print_r($response->body->contents);
+//die;
 
 $api = "/rest/agile/1.0/sprint/$sprint/issue";
 $response_2 = \Httpful\Request::get($baseuri.$api)                  // Build a GET request...
@@ -89,6 +91,10 @@ $ftr = true; // First Time Right
 $effectiveStoryPointsDone = 0;
 $i = 0;
 
+$storyPointsPlanned = 0;
+$storyPointsAddedMidSprint = 0;
+$storyPointsRemovedMidSprint = 0;
+$storyPointsCompleted = 0;
 
 echo "<b>Completed Issues</b>";
 $issues = $response->body->contents->completedIssues;
@@ -99,12 +105,13 @@ $issueKeysAddedDuringSprint = $response->body->contents->issueKeysAddedDuringSpr
 $completedIssuesStat = showIssuesList($issues, $issueKeysAddedDuringSprint, "completed");
 ?>
 <h3>Total Story Points: <?php echo $completedIssuesStat['totalStoryPoints'];?></h3>
-<h3>Total Story Points in Bugs: <?php echo $completedIssuesStat['bugsStoryPoints'];?></h3>
+<h3>Total Story Points for Bugs: <?php echo $completedIssuesStat['bugsStoryPoints'];?></h3>
 <h3>Story Points Done First Time Right: <?php echo $completedIssuesStat['firstTimeRightStoryPoints'];?></h3>
 <h3>FTR ratio: <?php echo round($completedIssuesStat['firstTimeRightStoryPoints']*100/$completedIssuesStat['totalStoryPoints'])?>%</h3>
 <h3>Effective Story Points Done: <?php echo $completedIssuesStat['effectiveStoryPoints'];?></h3>
 
-<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+
+<br/><br/><br/><br/>
 <hr/>
 <br/><br/><br/><br/>
 <?php
@@ -115,14 +122,24 @@ if( count($response->body->contents->issuesNotCompletedInCurrentSprint) >0 ){
     showIssuesList($issues, $issueKeysAddedDuringSprint, "not_completed");
 }
 
-
 if( count($response->body->contents->puntedIssues) >0 ){
     echo "<b>Issues Removed From Sprint</b>";
     $issues = $response->body->contents->puntedIssues;
     $issues = mergeIssueDetails($issues, $issues_additional_details);
     showIssuesList($issues, $issueKeysAddedDuringSprint, "removed");
 }
+?>
 
+<br/>
+<br/>
+<h3>Story Points Planned: <?php echo $storyPointsPlanned?></h3>
+<h3>Story Points added mid sprint: <?php echo $storyPointsAddedMidSprint?></h3>
+<h3>Story Points removed mid sprint: <?php echo $storyPointsRemovedMidSprint?></h3>
+<h3>Story Points Completed: <?php echo $storyPointsCompleted?></h3>
+<h3>Delivery Ratio = (Story Points Completed)/(Story Points Planned) = <?php echo round($storyPointsCompleted*100/$storyPointsPlanned)?>%</h3>
+<!--<h3>Story Points Planned: --><?php //echo $storyPointsPlanned?><!--</h3>-->
+
+<?php
 function mergeIssueDetails($grasshopperIssues, $issues_additional_details){
     foreach($grasshopperIssues as &$issues){
         $key = $issues->key;
@@ -154,6 +171,11 @@ function showIssuesList($issues, $issueKeysAddedDuringSprint, $type){
         "effectiveStoryPoints" => 0
     ];
 
+    global $storyPointsPlanned;
+    global $storyPointsAddedMidSprint;
+    global $storyPointsRemovedMidSprint;
+    global $storyPointsCompleted;
+
     $i = 0;
 
     echo "<table border=1>";
@@ -176,6 +198,30 @@ function showIssuesList($issues, $issueKeysAddedDuringSprint, $type){
         }
 
         $return['totalStoryPoints'] += getStoryPoints($value)['current'];
+
+        $storyPoints = getStoryPoints($value);
+
+        $storyPointsPlanned += $storyPoints['initial'];
+
+//        if( $storyPoints['initial'] != $storyPoints['current']){
+//            $storyPoints['initial'] = $storyPoints['initial'] ? $storyPoints['initial'] : 0;
+//            $storyPointsAddedMidSprint += ($storyPoints['current']-$storyPoints['initial']);
+//
+//            echo "|", $value->key, " ", $storyPointsAddedMidSprint,"|";
+//        }
+        $issueKey = $value->key;
+        if( $issueKeysAddedDuringSprint->$issueKey ){
+            $storyPointsAddedMidSprint += $storyPoints['current'];
+        }
+
+        if($type=='removed'){
+            $storyPointsRemovedMidSprint  +=  $storyPoints['initial'];
+        }
+
+        if($type == 'completed'){
+            $storyPointsCompleted += $storyPoints['current'];
+        }
+
 
         if($value->typeName == 'Bug')
             $return['bugsStoryPoints'] += getStoryPoints($value)['current'];
